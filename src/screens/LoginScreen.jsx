@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
     Image,
@@ -15,12 +15,15 @@ import {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const registeredPhoneNumber =
+    typeof params.phoneNumber === "string" ? params.phoneNumber : "";
 
   // State
   const [mpin, setMpin] = useState("");
   const [error, setError] = useState("");
 
-  const demoPhoneNumber = "0917 123 4567";
+  const demoPhoneNumber = registeredPhoneNumber || "0917 123 4567";
   const correctMPIN = "123456";
 
   const handleNumberPress = (number) => {
