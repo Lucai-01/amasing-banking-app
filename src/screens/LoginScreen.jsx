@@ -1,288 +1,162 @@
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import NumericKeypad from "@/components/NumericKeypad";
+import { API_URL } from "@/config/api";
+import { BankingContext } from "@/context/BankingContext";
+import { router } from "expo-router";
+import { Zap } from "lucide-react-native";
+import { useContext, useState } from "react";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
-  const router = useRouter();
+  const { setUser, setBalance } = useContext(BankingContext);
+  const [phoneDigits, setPhoneDigits] = useState("");
 
-  // State
-  const [mpin, setMpin] = useState("");
-  const [error, setError] = useState("");
-
-  const demoPhoneNumber = "0917 123 4567";
-  const correctMPIN = "123456";
-
-  const handleNumberPress = (number) => {
-    if (mpin.length < 6) {
-      setMpin((current) => current + number);
-      setError("");
-    }
+  const handleKeyPress = (digit) => {
+    if (phoneDigits.length >= 10) return;
+    setPhoneDigits((prev) => prev + digit);
   };
 
-  const handleBackspace = () => {
-    setMpin((current) => current.slice(0, -1));
-    setError("");
+  const handleDelete = () => {
+    setPhoneDigits((prev) => prev.slice(0, -1));
   };
 
-  const handleLogin = () => {
-    if (mpin.length < 6) {
-      setError("Please enter your 6-digit MPIN.");
+  const handleContinue = async () => {
+    if (phoneDigits.length !== 10) {
+      Alert.alert("Invalid Number", "Please enter a 10-digit mobile number.");
       return;
     }
 
-    if (mpin === correctMPIN) {
-      setError("");
-      router.replace("/home");
-    } else {
-      setError("Incorrect MPIN. Please try again.");
-      setMpin("");
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phoneDigits }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        Alert.alert(
+          "Account Not Found",
+          data.detail || "Please register an account first.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Register", onPress: () => router.push("/register") },
+          ],
+        );
+        return;
+      }
+
+      setUser({
+        ...data.user,
+        phone: data.user.maskedPhone,
+      });
+      setBalance(data.user.balance);
+      // Direct to MPIN passcode screen (no OTP needed on login)
+      router.push("/passcode");
+    } catch (err) {
+      Alert.alert(
+        "Connection Error",
+        "Could not reach the FastAPI server. Make sure it is running.",
+      );
     }
   };
 
-  const keypad = [
-    ["1", "2", "3"],
-    ["4", "5", "6"],
-    ["7", "8", "9"],
-    ["", "0", "backspace"],
-  ];
-
   return (
-    <LinearGradient colors={["black", "teal"]} style={styles.gradient}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
-      >
-        <ScrollView
-          contentContainerStyle={styles.overlay}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <View style={{ width: 24 }} />
+        <Text style={styles.brandTitle}>AMABank</Text>
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert(
+              "Demo Login",
+              "Enter your registered 10-digit number (or default 9171233387) and tap the check button.",
+            )
+          }
         >
-          {/* LOGO */}
-          <Image
-            source={require("../../assets/snack-icon.png")}
-            style={styles.logo}
-          />
+          <Zap size={22} color="#1A1A1A" fill="#1A1A1A" />
+        </TouchableOpacity>
+      </View>
 
-          {}
-          <View style={styles.form}>
-            {}
-            <View style={styles.phoneRow}>
-              <Text style={styles.phoneNumber}>{demoPhoneNumber}</Text>
-              <TouchableOpacity onPress={() => router.replace("/login")}>
-                <Text style={styles.changeNumberText}>Change Number</Text>
-              </TouchableOpacity>
-            </View>
+      <Text style={styles.promptTitle}>Enter your number</Text>
 
-            <Text style={styles.instructionText}>Enter your MPIN</Text>
+      <View style={styles.phoneRow}>
+        <Text style={styles.countryCode}>+63</Text>
+        <View style={styles.underlineBox}>
+          <Text style={styles.phoneText}>{phoneDigits}</Text>
+        </View>
+      </View>
 
-            {/* MPIN DOTS */}
-            <View style={styles.pinContainer}>
-              {[0, 1, 2, 3, 4, 5].map((index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.pinDot,
-                    index < mpin.length && styles.pinDotFilled,
-                  ]}
-                />
-              ))}
-            </View>
+      <NumericKeypad
+        onKeyPress={handleKeyPress}
+        onDelete={handleDelete}
+        showConfirm
+        confirmReady={phoneDigits.length === 10}
+        onConfirm={handleContinue}
+      />
 
-            {/* ERROR MESSAGE */}
-            {error !== "" && <Text style={styles.errorText}>{error}</Text>}
-
-            {/* CUSTOM KEYPAD */}
-            <View style={styles.keypad}>
-              {keypad.map((row, rowIndex) => (
-                <View key={rowIndex} style={styles.keypadRow}>
-                  {row.map((key, index) => {
-                    if (key === "") {
-                      return (
-                        <View key={index} style={styles.numberButtonEmpty} />
-                      );
-                    }
-                    if (key === "backspace") {
-                      return (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.numberButton}
-                          onPress={handleBackspace}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons
-                            name="backspace-outline"
-                            size={24}
-                            color="dimgray"
-                          />
-                        </TouchableOpacity>
-                      );
-                    }
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.numberButton}
-                        onPress={() => handleNumberPress(key)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.numberText}>{key}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
-
-            {/* LOGIN BUTTON */}
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleLogin}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.actionButtonText}>Login</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.footerLink}
-              onPress={() => router.push("/register")}
-            >
-              <Text style={styles.footerText}>
-                No account? <Text style={styles.footerTextlink}>Sign Up</Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.demoText}>Demo MPIN: 123456</Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+      <View style={styles.footerGroup}>
+        <TouchableOpacity onPress={() => router.push("/register")}>
+          <Text style={styles.footerText}>
+            Don't have an account?{" "}
+            <Text style={styles.coralLink}>Register</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1 },
-  container: { flex: 1 },
-  overlay: { flexGrow: 1, padding: 20, paddingTop: 60, paddingBottom: 40 },
-
-  logo: {
-    width: 100,
-    height: 100,
-    alignSelf: "center",
-    marginBottom: 25,
-    marginTop: 10,
-    borderRadius: 20,
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 24,
+    justifyContent: "space-between",
+    paddingBottom: 24,
   },
-
-  form: {
-    backgroundColor: "white",
-    width: "100%",
-    padding: 25,
-    borderRadius: 15,
-    shadowColor: "black",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
   },
-
+  brandTitle: { fontSize: 22, fontWeight: "700", color: "#1A1A1A" },
+  promptTitle: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: "#DF5A56",
+    textAlign: "center",
+  },
   phoneRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
-  },
-  phoneNumber: { fontSize: 16, fontWeight: "bold", color: "dimgray" },
-  changeNumberText: { fontSize: 13, color: "blue", fontWeight: "500" },
-  instructionText: {
-    textAlign: "center",
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "black",
-    marginBottom: 20,
-  },
-
-  /* PIN Dots */
-  pinContainer: {
-    flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 15,
     gap: 12,
+    paddingHorizontal: 20,
   },
-  pinDot: {
-    width: 15,
-    height: 15,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "lightgray",
-    backgroundColor: "white",
+  countryCode: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#1A1A1A",
+    borderBottomWidth: 2,
+    borderBottomColor: "#1A1A1A",
+    paddingBottom: 4,
   },
-  pinDotFilled: { backgroundColor: "forestgreen", borderColor: "forestgreen" },
-
-  errorText: {
-    color: "red",
-    textAlign: "center",
-    fontSize: 13,
-    marginBottom: 10,
+  underlineBox: {
+    flex: 1,
+    borderBottomWidth: 2,
+    borderBottomColor: "#1A1A1A",
+    paddingBottom: 4,
+    minHeight: 34,
   },
-
-  /* Keypad */
-  keypad: { width: "100%", marginTop: 5 },
-  keypadRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
+  phoneText: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#1A1A1A",
+    letterSpacing: 1.5,
   },
-  numberButton: {
-    width: "30%",
-    height: 55,
-    borderWidth: 1,
-    borderColor: "lightgray",
-    borderRadius: 10,
-    backgroundColor: "whitesmoke",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  numberButtonEmpty: {
-    width: "30%",
-    height: 55,
-    backgroundColor: "transparent",
-  },
-  numberText: { fontSize: 21, fontWeight: "600", color: "dimgray" },
-
-  actionButton: {
-    backgroundColor: "forestgreen",
-    borderRadius: 10,
-    paddingVertical: 15,
-    alignItems: "center",
-    marginBottom: 15,
-    marginTop: 10,
-  },
-  actionButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
-    letterSpacing: 1,
-  },
-
-  footerLink: { alignItems: "center" },
-  footerText: { color: "black", fontSize: 14 },
-  footerTextlink: { color: "forestgreen", fontSize: 14, fontWeight: "bold" },
-
-  demoText: {
-    color: "white",
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 20,
-  },
+  footerGroup: { alignItems: "center", gap: 8 },
+  footerText: { fontSize: 14, fontWeight: "600", color: "#1A1A1A" },
+  coralLink: { color: "#DF5A56", fontSize: 14, fontWeight: "700" },
 });

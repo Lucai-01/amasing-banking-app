@@ -1,4 +1,4 @@
-import OTPScreen from '../screens/OTPScreen';
+import OTPScreen from "@/screens/OTPScreen";
 
 export default function OTPRoute() {
   return <OTPScreen />;

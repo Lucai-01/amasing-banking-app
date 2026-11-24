@@ -1,44 +1,34 @@
-import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-export default function QuickAction({ icon, title, description, onPress }) {
+export default function QuickAction({ label, icon, onPress }) {
   return (
     <TouchableOpacity
-      style={styles.container}
-      onPress={onPress}
+      style={styles.actionItem}
       activeOpacity={0.8}
+      onPress={onPress}
     >
-      <View style={styles.iconContainer}>
-        <Ionicons name={icon} size={28} color="forestgreen" />
-      </View>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.description}>{description}</Text>
+      <View style={styles.actionCircle}>{icon}</View>
+      <Text style={styles.actionLabel}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: "48%",
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 12,
-    shadowColor: "black",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "whitesmoke",
+  actionItem: {
     alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
+    gap: 6,
   },
-  title: { color: "black", fontSize: 15, fontWeight: "bold" },
-  description: { color: "gray", fontSize: 11, marginTop: 3 },
+  actionCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#1A1A1A",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  actionLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1A1A1A",
+  },
 });

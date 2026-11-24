@@ -1,163 +1,166 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import GradientBackground from "../components/GradientBackground";
+import NumericKeypad from "@/components/NumericKeypad";
+import ScreenHeader from "@/components/ScreenHeader";
+import { BankingContext } from "@/context/BankingContext";
+import { router, useLocalSearchParams } from "expo-router";
+import { Zap } from "lucide-react-native";
+import { useContext, useEffect, useState } from "react";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function OTPScreen() {
-  const router = useRouter();
+  const { user } = useContext(BankingContext);
+  const { mode = "login", phone = "" } = useLocalSearchParams();
   const [otp, setOtp] = useState("");
+  const [timer, setTimer] = useState(30);
 
-  const handleVerify = () => {
-    console.log({ otp });
-    router.replace("/");
+  const isRegister = mode === "register";
+  const displayPhone = phone
+    ? `+63********${String(phone).slice(-4)}`
+    : user.phone;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleKeyPress = (digit) => {
+    if (otp.length >= 6) return;
+    setOtp((prev) => prev + digit);
+  };
+
+  const handleDelete = () => {
+    setOtp((prev) => prev.slice(0, -1));
+  };
+
+  const handleVerifyOTP = () => {
+    if (otp.length !== 6) {
+      Alert.alert(
+        "Incomplete OTP",
+        "Please enter the 6-digit verification code.",
+      );
+      return;
+    }
+
+    if (isRegister) {
+      router.push({
+        pathname: "/kyc",
+        params: { phone: String(phone) },
+      });
+    } else {
+      router.push("/passcode");
+    }
   };
 
   return (
-    <GradientBackground colors={["black", "teal"]} style={styles.container}>
-      <KeyboardAvoidingView
-        behavior="padding"
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 25}
-        style={styles.container}
-      >
-        <ScrollView
-          contentContainerStyle={styles.overlay}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Image
-            source={require("../../assets/snack-icon.png")}
-            style={styles.logo}
-          />
-          <Text style={styles.title}>VERIFICATION</Text>
-          <Text style={styles.titleBody}>
-            Enter the OTP sent to your device.
-          </Text>
+    <SafeAreaView style={styles.container}>
+      <ScreenHeader
+        title="AMABank"
+        rightIcon={<Zap size={20} color="#1A1A1A" fill="#1A1A1A" />}
+        onRightPress={() =>
+          Alert.alert(
+            "OTP Demo",
+            "Enter any 6 digits and tap the check button.",
+          )
+        }
+      />
 
-          <View style={styles.form}>
-            <View style={styles.inputBox}>
-              <Ionicons
-                name="keypad-outline"
-                size={20}
-                color="dimgray"
-                style={styles.icon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter OTP Code"
-                placeholderTextColor="rgba(0, 0, 0, 0.5)"
-                keyboardType="number-pad"
-                maxLength={6}
-                value={otp}
-                onChangeText={setOtp}
-              />
-            </View>
+      <View style={styles.subHeader}>
+        {isRegister && (
+          <Text style={styles.stepTag}>STEP 2 OF 3 • OTP VERIFICATION</Text>
+        )}
+        <Text style={styles.promptTitle}>Enter your OTP</Text>
+        <Text style={styles.subtitle}>We sent it to {displayPhone}</Text>
+        <Text style={styles.subtitle}>(Ref: PA6Q)</Text>
+      </View>
 
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleVerify}
-            >
-              <Text style={styles.actionButtonText}>Verify</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.footerLink}
-              onPress={() => router.back()}
-            >
-              <Text style={styles.footerText}>
-                Didn't receive code?{" "}
-                <Text style={styles.footerTextlink}>Go Back</Text>
-              </Text>
-            </TouchableOpacity>
+      <View style={styles.slotsRow}>
+        {[0, 1, 2, 3, 4, 5].map((index) => (
+          <View key={index} style={styles.slot}>
+            <Text style={styles.slotDigit}>{otp[index] || ""}</Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </GradientBackground>
+        ))}
+      </View>
+
+      <NumericKeypad
+        onKeyPress={handleKeyPress}
+        onDelete={handleDelete}
+        showConfirm
+        confirmReady={otp.length === 6}
+        onConfirm={handleVerifyOTP}
+      />
+
+      <TouchableOpacity
+        style={styles.footerLink}
+        onPress={() => {
+          setOtp("");
+          setTimer(30);
+          Alert.alert("OTP Resent", "A new verification code was sent.");
+        }}
+      >
+        <Text style={styles.coralLink}>
+          {timer > 0 ? `Get a new OTP (${timer}s)` : "Get a new OTP"}
+        </Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  overlay: {
-    flexGrow: 1,
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 24,
+    justifyContent: "space-between",
+    paddingBottom: 24,
+  },
+  subHeader: {
     alignItems: "center",
-    padding: 20,
-    paddingTop: 80,
-    paddingBottom: 40,
+    gap: 4,
   },
-  logo: {
-    width: 250,
-    height: 250,
-    alignSelf: "center",
-    marginBottom: 50,
-    marginTop: 10,
-  },
-  title: {
-    fontSize: 25,
-    fontWeight: "bold",
-    color: "white",
-    marginBottom: 1,
-    letterSpacing: 2,
-    alignSelf: "flex-start",
-    marginLeft: 10,
-  },
-  titleBody: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "white",
-    marginBottom: 30,
-    letterSpacing: 2,
-    alignSelf: "flex-start",
-    marginLeft: 10,
-  },
-  form: {
-    backgroundColor: "white",
-    width: "100%",
-    padding: 25,
-    borderRadius: 15,
-    shadowColor: "black",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  inputBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "lightgray",
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    marginBottom: 15,
-    backgroundColor: "whitesmoke",
-  },
-  icon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 16 },
-  actionButton: {
-    backgroundColor: "forestgreen",
-    borderRadius: 10,
-    paddingVertical: 15,
-    alignItems: "center",
-    marginBottom: 20,
-    marginTop: 10,
-  },
-  actionButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
+  stepTag: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#737373",
     letterSpacing: 1,
+    marginBottom: 4,
   },
-  footerLink: { alignItems: "center" },
-  footerText: { color: "black", fontSize: 14 },
-  footerTextlink: { color: "blue", fontSize: 14, fontWeight: "bold" },
+  promptTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#DF5A56",
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1A1A1A",
+  },
+  slotsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 14,
+  },
+  slot: {
+    width: 28,
+    height: 36,
+    borderBottomWidth: 2,
+    borderBottomColor: "#1A1A1A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  slotDigit: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  footerLink: {
+    alignItems: "center",
+  },
+  coralLink: {
+    color: "#DF5A56",
+    fontSize: 14,
+    fontWeight: "600",
+  },
 });

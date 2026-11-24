@@ -1,169 +1,217 @@
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useContext } from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import BottomNav from "@/components/BottomNav";
+import ScreenHeader from "@/components/ScreenHeader";
+import TransactionItem from "@/components/TransactionItem";
+import { BankingContext } from "@/context/BankingContext";
+import { router } from "expo-router";
+import { Search, X } from "lucide-react-native";
+import { useContext, useMemo, useState } from "react";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import BottomNav from "../components/BottomNav";
-import TransactionItem from "../components/TransactionItem";
-import { BankingContext } from "../context/BankingContext";
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "in", label: "Money In" },
+  { key: "out", label: "Money Out" },
+];
 
 export default function TransactionsScreen() {
-  const router = useRouter();
-  const { balance, transactions } = useContext(BankingContext);
+  const { transactions } = useContext(BankingContext);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const getIconForCategory = (category) => {
-    switch (category) {
-      case "Income":
-        return "arrow-down-circle";
-      case "Groceries":
-        return "cart";
-      case "Utilities":
-        return "flash";
-      case "Transfer":
-        return "arrow-up-circle";
-      default:
-        return "receipt";
-    }
-  };
+  const counts = useMemo(() => {
+    const moneyIn = transactions.filter((tx) => tx.type === "credit").length;
+    const moneyOut = transactions.filter((tx) => tx.type === "debit").length;
+    return {
+      all: transactions.length,
+      in: moneyIn,
+      out: moneyOut,
+    };
+  }, [transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return transactions.filter((tx) => {
+      if (activeFilter === "in" && tx.type !== "credit") return false;
+      if (activeFilter === "out" && tx.type !== "debit") return false;
+
+      if (!query) return true;
+
+      const refMatch = (tx.referenceNo || "").toLowerCase().includes(query);
+      const recipientMatch = (tx.recipient || "").toLowerCase().includes(query);
+      const noteMatch = (tx.note || "").toLowerCase().includes(query);
+
+      return refMatch || recipientMatch || noteMatch;
+    });
+  }, [transactions, activeFilter, searchQuery]);
 
   return (
-    <LinearGradient colors={["black", "teal"]} style={styles.gradient}>
-      <SafeAreaView style={styles.container}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Transactions</Text>
-            <Text style={styles.headerSubtitle}>Your recent activity</Text>
-          </View>
-          <View style={styles.headerIcon}>
-            <Ionicons name="receipt" size={27} color="white" />
-          </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.inner}>
+        <ScreenHeader title="Transactions" showBack={false} />
+
+        {/* Reference ID / Recipient Search Bar */}
+        <View style={styles.searchBox}>
+          <Search size={18} color="#737373" strokeWidth={2.2} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search Reference ID (e.g. REF...) or name"
+            placeholderTextColor="#8C8C8C"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="search"
+            style={styles.searchInput}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery("")}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <X size={18} color="#525252" />
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* CONTENT */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}
-        >
-          {/* SUMMARY CARD */}
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Total Balance</Text>
-            <Text style={styles.summaryAmount}>{balance}</Text>
-            <View style={styles.summaryRow}>
-              <View>
-                <Text style={styles.summarySmall}>Money In</Text>
-                <Text style={styles.incomeSummary}>+₱3,500.00</Text>
-              </View>
-              <View>
-                <Text style={styles.summarySmall}>Money Out</Text>
-                <Text style={styles.expenseSummary}>-₱2,500.00</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* ALL TRANSACTIONS CARD */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>All Transactions</Text>
-
-            {transactions.map((item, index) => (
-              <View
-                key={item.id}
+        {/* All / Money In / Money Out Filter Tabs */}
+        <View style={styles.filterRow}>
+          {FILTERS.map((tab) => {
+            const isSelected = activeFilter === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
                 style={[
-                  styles.transaction,
-                  index === transactions.length - 1 && styles.lastTransaction,
+                  styles.filterPill,
+                  isSelected && styles.filterPillSelected,
                 ]}
+                activeOpacity={0.8}
+                onPress={() => setActiveFilter(tab.key)}
               >
-                <TransactionItem
-                  title={item.title || item.category}
-                  description={item.merchant}
-                  date={item.date.split(",")[0]}
-                  amount={item.amount}
-                  icon={getIconForCategory(item.category)}
-                  type={item.type === "credit" ? "income" : "expense"}
-                  onPress={() => router.push(`/details/${item.id}`)}
-                />
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+                <Text
+                  style={[
+                    styles.filterText,
+                    isSelected && styles.filterTextSelected,
+                  ]}
+                >
+                  {tab.label} ({counts[tab.key]})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-        {/* BOTTOM NAVIGATION */}
-        <BottomNav
-          active="home"
-          onHome={() => router.replace("/home")}
-          onTransactions={() => router.replace("/transactions")}
-          onProfile={() => router.replace("/profile")}
-          onLogout={() => router.replace("/")}
+        {/* Filtered Transactions List */}
+        <FlatList
+          data={filteredTransactions}
+          keyExtractor={(item) => String(item.id)}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <TransactionItem
+              item={item}
+              onPressDetails={() =>
+                router.push({
+                  pathname: "/details/[id]",
+                  params: { id: String(item.id) },
+                })
+              }
+            />
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>No matching transactions</Text>
+              <Text style={styles.emptySub}>
+                {searchQuery
+                  ? `No records found for "${searchQuery}".`
+                  : "Transactions for this category will appear here."}
+              </Text>
+            </View>
+          }
         />
-      </SafeAreaView>
-    </LinearGradient>
+      </View>
+
+      <BottomNav />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1 },
-  container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 15,
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
   },
-  headerTitle: { color: "white", fontSize: 25, fontWeight: "bold" },
-  headerSubtitle: { color: "lightgray", fontSize: 13, marginTop: 4 },
-  headerIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 25,
-    backgroundColor: "rgba(255,255,255,0.15)",
+  inner: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 4,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 46,
+    gap: 10,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1A1A1A",
+  },
+  filterRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+  filterPill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#F5F5F5",
     alignItems: "center",
     justifyContent: "center",
   },
-  content: { padding: 20, paddingBottom: 30 },
-  summaryCard: {
-    backgroundColor: "white",
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 20,
+  filterPillSelected: {
+    backgroundColor: "#1E1E1E",
   },
-  summaryLabel: { color: "gray", fontSize: 12 },
-  summaryAmount: {
-    color: "black",
-    fontSize: 28,
-    fontWeight: "bold",
-    marginTop: 5,
-    marginBottom: 18,
+  filterText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#525252",
   },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: "lightgray",
-    paddingTop: 15,
+  filterTextSelected: {
+    color: "#FFFFFF",
   },
-  summarySmall: { color: "gray", fontSize: 11, marginBottom: 3 },
-  incomeSummary: { color: "forestgreen", fontSize: 14, fontWeight: "bold" },
-  expenseSummary: { color: "red", fontSize: 14, fontWeight: "bold" },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    paddingTop: 20,
+  listContent: {
+    gap: 10,
+    paddingBottom: 120,
   },
-  sectionTitle: {
-    color: "black",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  transaction: {
-    flexDirection: "row",
+  emptyBox: {
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "lightgray",
+    marginTop: 54,
+    paddingHorizontal: 24,
+    gap: 6,
   },
-  lastTransaction: { borderBottomWidth: 0, paddingBottom: 15 },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A1A",
+  },
+  emptySub: {
+    fontSize: 13,
+    color: "#737373",
+    textAlign: "center",
+  },
 });
